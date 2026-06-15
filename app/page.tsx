@@ -1,19 +1,17 @@
-'use client';
-
-import { useState } from 'react';
-import LandingPage from './components/LandingPage';
-import ProfessionalPortfolio from './components/ProfessionalPortfolio';
+import Nav     from './components/Nav';
+import Hero    from './components/Hero';
+import About   from './components/About';
+import Gallery from './components/Gallery';
+import Contact from './components/Contact';
 
 export default function Home() {
-  const [view, setView] = useState<'landing' | 'professional' | 'academic'>('landing');
-
-  if (view === 'landing') {
-    return <LandingPage onSelect={setView} />;
-  }
-
-  if (view === 'professional') {
-    return <ProfessionalPortfolio />;
-  }
-
-  return <div />;
+  return (
+    <main className="bg-ink">
+      <Nav />
+      <Hero />
+      <About />
+      <Gallery />
+      <Contact />
+    </main>
+  );
 }
