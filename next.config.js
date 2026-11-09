@@ -13,6 +13,9 @@ const nextConfig = {
       },
     ],
   },
+  async rewrites() {
+    return [{ source: '/planning', destination: '/planning/index.html' }];
+  },
   experimental: {
     optimizePackageImports: ['framer-motion'],
   },
