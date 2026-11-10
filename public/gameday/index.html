@@ -2,13 +2,16 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
 <title>Gameday Espoirs HTV</title>
+<meta name="claude:viewport-fit-sides" content="cover">
 <style>
-  :root { --bg:#0f0d14; --panel:#1a1722; --line:#2d2838; --txt:#f3eef8; --mute:#a59cb3; --acc:#ff4fa3; --ok:#4ade80; --warn:#fbbf24; }
+  :root { --bg:#0f0d14; --panel:#1a1722; --line:#2d2838; --txt:#f3eef8; --mute:#a59cb3; --acc:#ff4fa3; --ok:#4ade80; --warn:#fbbf24; color-scheme:dark; }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--txt); font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
-  main { max-width:1180px; margin:0 auto; padding:24px 16px 48px; display:grid; gap:24px; grid-template-columns:minmax(0,1fr) 400px; align-items:start; }
+  main { max-width:1180px; margin:0 auto; padding-block:24px 48px; padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); display:grid; gap:24px; grid-template-columns:minmax(0,1fr) 400px; align-items:start; }
   @media (max-width:880px) { main { grid-template-columns:1fr; } .preview { position:static !important; } }
   h1 { font-size:20px; margin:0 0 4px; }
   .sub { color:var(--mute); margin:0 0 8px; font-size:13px; }
@@ -42,9 +45,9 @@
   .font.ok { color:var(--ok); } .font.ko { color:var(--warn); }
   .font button { background:none; border:0; color:inherit; text-decoration:underline; cursor:pointer; padding:0; font-size:12px; }
   .hidden { display:none; }
+  .note { font-size:12px; color:var(--mute); margin:8px 0 0; text-align:center; min-height:1em; }
+  .ghost.armed { border-color:var(--warn); color:var(--warn); }
 </style>
-</head>
-<body>
 <main>
   <section class="preview">
     <canvas id="cv" width="1080" height="1350"></canvas>
@@ -118,6 +121,7 @@
     </details>
 
     <button class="primary" id="dl">Télécharger le PNG</button>
+    <p class="note" id="dlNote"></p>
     <button class="ghost" id="resetAll">Tout remettre comme le PSD</button>
     <input type="file" id="pick" accept="image/*" class="hidden">
     <input type="file" id="pickFont" accept=".otf,.ttf,.woff,.woff2" class="hidden">
@@ -277,21 +281,41 @@
     b.onclick = () => { S['img_' + b.dataset.reset] = null; save(); refreshImg(b.dataset.reset); };
   });
 
-  $('resetAll').onclick = () => {
-    if (!confirm('Tout remettre comme le PSD d\'origine ?')) return;
+  let armed = null;
+  const resetBtn = $('resetAll'), resetLabel = resetBtn.textContent;
+  resetBtn.onclick = () => {
+    if (!armed) {   // premier clic : confirmation dans la page
+      resetBtn.textContent = 'Clique encore pour confirmer'; resetBtn.classList.add('armed');
+      armed = setTimeout(() => { armed = null; resetBtn.textContent = resetLabel; resetBtn.classList.remove('armed'); }, 4000);
+      return;
+    }
+    clearTimeout(armed); armed = null; resetBtn.textContent = resetLabel; resetBtn.classList.remove('armed');
     S = { ...DEFAULTS }; save(); syncInputs();
     ['bg', 'home', 'away'].forEach(refreshImg);
   };
 
   // ---------- export ----------
+  const note = msg => { $('dlNote').textContent = msg; };
+  const MANUAL = 'Clic droit sur l\'aperçu puis « Enregistrer l\'image sous… » pour la récupérer.';
+  let downloads = null;
+  if (window.claude?.use) window.claude.use('downloads').then(d => { downloads = d; if (!d) note(MANUAL); }).catch(() => note(MANUAL));
   $('dl').onclick = () => {
     draw();
     const slug = S.info.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    cv.toBlob(b => {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(b);
-      a.download = `gameday_espoirs_${slug || 'match'}.png`;
-      a.click();
+    const filename = `gameday_espoirs_${slug || 'match'}.png`;
+    cv.toBlob(async b => {
+      if (window.claude?.use) {   // dans Claude : le téléchargement passe par une confirmation
+        if (!downloads) { note(MANUAL); return; }
+        try { await downloads.save({ filename, data: b }); note('Image enregistrée ✓'); }
+        catch (e) {
+          if (e?.code === 'declined') note('Téléchargement annulé.');
+          else if (e?.code === 'rate_limited') note('Une demande est déjà ouverte, réessaie dans un instant.');
+          else note(MANUAL);
+        }
+        return;
+      }
+      const a = document.createElement('a');   // fichier ouvert directement dans le navigateur
+      a.href = URL.createObjectURL(b); a.download = filename; a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 2000);
     }, 'image/png');
   };
@@ -329,5 +353,6 @@
   ['bg', 'home', 'away'].forEach(refreshImg);
 })();
 </script>
+
 </body>
 </html>
